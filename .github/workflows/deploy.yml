@@ -1,0 +1,56 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  DOCKER_IMAGE: hello_world
+  DOCKER_REGISTRY: docker.io
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Generate Secret Key Base
+        run: |
+          echo "SECRET_KEY_BASE=$(openssl rand -base64 48)" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: apps/hello_world/Dockerfile
+          push: false
+          load: true
+          tags: ${{ env.DOCKER_IMAGE }}:latest
+
+      - name: Copy Docker image to DigitalOcean
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          echo "$SSH_KEY" > deploy_key
+          chmod 600 deploy_key
+          docker save ${{ env.DOCKER_IMAGE }}:latest | ssh -i deploy_key -o StrictHostKeyChecking=no root@142.93.157.130 'docker load'
+
+      - name: Deploy to DigitalOcean
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          ssh -i deploy_key -o StrictHostKeyChecking=no root@142.93.157.130 '
+            docker stop hello_world || true
+            docker rm hello_world || true
+            docker run -d \
+              --name hello_world \
+              -p 80:4000 \
+              -e SECRET_KEY_BASE=${{ env.SECRET_KEY_BASE }} \
+              -e PHX_HOST=142.93.157.130 \
+              -e PORT=4000 \
+              --restart unless-stopped \
+              ${{ env.DOCKER_IMAGE }}:latest
+          ' 

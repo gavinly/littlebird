@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Anoma Intent Demo</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <meta name="csrf-token" content={get_csrf_token()} />
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+      .form-group { margin-bottom: 15px; }
+      label { display: block; margin-bottom: 5px; }
+      input { width: 100%; padding: 8px; margin-bottom: 10px; }
+      button { background: #4CAF50; color: white; padding: 10px 15px; border: none; cursor: pointer; }
+      .intent-list { margin-top: 20px; }
+      .intent-item { 
+        border: 1px solid #ddd; 
+        padding: 15px; 
+        margin-bottom: 15px;
+        border-radius: 4px;
+      }
+      .intent-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .intent-id {
+        font-family: monospace;
+        color: #666;
+      }
+      .intent-status {
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 0.9em;
+      }
+      .status-pending {
+        background: #fff3cd;
+        color: #856404;
+      }
+      .status-matched {
+        background: #d4edda;
+        color: #155724;
+      }
+      .intent-details {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+      .intent-constraints {
+        margin-top: 10px;
+        font-size: 0.9em;
+        color: #666;
+      }
+      .info-box {
+        background: #e3f2fd;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+      }
+      .matched-intents {
+        margin-top: 2rem;
+        opacity: 0.8;
+      }
+      
+      .matched-intents .intent-item {
+        background: #f8f9fa;
+      }
+
+      .intent-timestamp {
+        margin-top: 0.5rem;
+        font-size: 0.85em;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Anoma Intent Demo</h1>
+    
+    <div class="info-box">
+      <h3>About Intents</h3>
+      <p>
+        In Anoma, users express their desired outcomes through intents rather than specific actions.
+        The system automatically matches compatible intents and facilitates their resolution.
+      </p>
+    </div>
+
+    <div class="form-group">
+      <h2>Submit New Intent</h2>
+      <form hx-post="/intents" hx-swap="none" hx-on::after="document.querySelector('.pending-intents').setAttribute('hx-trigger', 'load')">
+        <input type="hidden" name="_csrf_token" value={get_csrf_token()} />
+        <label>Source Account:</label>
+        <input type="text" name="intent[source]" required placeholder="e.g., account1">
+        
+        <label>Target Account:</label>
+        <input type="text" name="intent[target]" required placeholder="e.g., account2">
+        
+        <label>Amount:</label>
+        <input type="number" name="intent[amount]" required placeholder="Amount to transfer">
+        
+        <button type="submit">Submit Intent</button>
+      </form>
+    </div>
+
+    <div class="intent-list">
+      <h2>Active Intents</h2>
+      <div class="pending-intents" hx-get="/intents" hx-trigger="load, every 5s">
+        Loading intents...
+      </div>
+
+      <h2>Matched Intents History</h2>
+      <div class="matched-intents" hx-get="/intents" hx-trigger="load, every 5s">
+        Loading matched intents...
+      </div>
+    </div>
+
+    <template id="intent-template">
+      <div class="intent-item">
+        <div class="intent-header">
+          <span class="intent-id"></span>
+          <span class="intent-status"></span>
+        </div>
+        <div class="intent-details">
+          <div>From: <span class="intent-source"></span></div>
+          <div>To: <span class="intent-target"></span></div>
+          <div>Amount: <span class="intent-amount"></span></div>
+          <div>Type: <span class="intent-type"></span></div>
+        </div>
+        <div class="intent-constraints"></div>
+        <div class="intent-timestamp"></div>
+      </div>
+    </template>
+
+    <script>
+      document.body.addEventListener('htmx:configRequest', function(evt) {
+        evt.detail.headers['x-csrf-token'] = document.querySelector('meta[name="csrf-token"]').content;
+      });
+
+      document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.matches('form')) {
+          evt.detail.target.reset();
+        }
+      });
+
+      function formatTimestamp(timestamp) {
+        return new Date(timestamp).toLocaleString();
+      }
+
+      function renderIntent(intent, template) {
+        const clone = template.content.cloneNode(true);
+        
+        clone.querySelector('.intent-id').textContent = `ID: ${intent.id}`;
+        clone.querySelector('.intent-status').textContent = intent.status;
+        clone.querySelector('.intent-status').classList.add(
+          intent.status === 'pending' ? 'status-pending' : 'status-matched'
+        );
+        clone.querySelector('.intent-source').textContent = intent.source;
+        clone.querySelector('.intent-target').textContent = intent.target;
+        clone.querySelector('.intent-amount').textContent = intent.amount;
+        clone.querySelector('.intent-type').textContent = intent.type;
+        
+        const constraints = Object.entries(intent.constraints || {})
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ');
+        clone.querySelector('.intent-constraints').textContent = 
+          constraints ? `Constraints: ${constraints}` : '';
+        
+        clone.querySelector('.intent-timestamp').textContent = 
+          `Created: ${formatTimestamp(intent.timestamp)}`;
+        
+        return clone;
+      }
+
+      // Handle form submission response
+      document.body.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.successful) {
+          console.log('Request successful:', evt.detail);
+          if (evt.detail.xhr.status === 200) {
+            try {
+              const response = JSON.parse(evt.detail.xhr.response);
+              console.log('Parsed response:', response);
+              
+              // If this was a form submission, trigger a refresh of the intents list
+              if (evt.detail.elt.tagName === 'FORM') {
+                console.log('Form submission successful, refreshing intents list');
+                const intentsDiv = document.querySelector('.pending-intents');
+                intentsDiv.setAttribute('hx-trigger', 'load');
+                htmx.process(intentsDiv);
+              }
+              
+              // If this was the intents list update
+              if (evt.detail.pathInfo.requestPath === '/intents') {
+                console.log('Updating intents lists with:', response);
+                const template = document.getElementById('intent-template');
+                
+                // Update pending intents
+                const pendingContainer = document.querySelector('.pending-intents');
+                pendingContainer.innerHTML = '';
+                if (response.pending_intents && response.pending_intents.length > 0) {
+                  response.pending_intents.forEach(intent => {
+                    pendingContainer.appendChild(renderIntent(intent, template));
+                  });
+                } else {
+                  pendingContainer.innerHTML = '<p>No pending intents</p>';
+                }
+                
+                // Update matched intents
+                const matchedContainer = document.querySelector('.matched-intents');
+                matchedContainer.innerHTML = '';
+                if (response.matched_intents && response.matched_intents.length > 0) {
+                  response.matched_intents.forEach(intent => {
+                    matchedContainer.appendChild(renderIntent(intent, template));
+                  });
+                } else {
+                  matchedContainer.innerHTML = '<p>No matched intents</p>';
+                }
+              }
+            } catch (e) {
+              console.error('Error parsing response:', e, evt.detail.xhr.response);
+            }
+          }
+        } else {
+          console.error('Request failed:', evt.detail.xhr.status, evt.detail.xhr.response);
+        }
+      });
+
+      // Add error handling for HTMX errors
+      document.body.addEventListener('htmx:error', function(evt) {
+        console.error('HTMX error:', evt.detail);
+      });
+
+      // Add error handling for HTMX response errors
+      document.body.addEventListener('htmx:responseError', function(evt) {
+        console.error('HTMX response error:', evt.detail);
+      });
+    </script>
+  </body>
+</html> 

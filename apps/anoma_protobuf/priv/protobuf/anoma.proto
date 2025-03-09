@@ -1,0 +1,45 @@
+
+syntax = "proto3";
+
+package Anoma.Protobuf;
+
+import "nock/prove.proto";
+import "nock/run.proto";
+import "intents/list_intents.proto";
+import "intents/add_intent.proto";
+import "indexer/nullifiers.proto";
+import "indexer/unrevealed_commits.proto";
+import "indexer/unspent_resources.proto";
+import "mempool/add_transaction.proto";
+
+service NockService {
+  rpc Prove(Anoma.Protobuf.Nock.Prove.Request)
+      returns (Anoma.Protobuf.Nock.Prove.Response) {}
+
+  rpc Run(Anoma.Protobuf.Nock.Run.Request)
+      returns (Anoma.Protobuf.Nock.Run.Response) {}
+}
+
+service IntentsService {
+  rpc ListIntents(Anoma.Protobuf.Intents.List.Request)
+      returns (Anoma.Protobuf.Intents.List.Response) {}
+
+  rpc AddIntent(Anoma.Protobuf.Intents.Add.Request)
+      returns (Anoma.Protobuf.Intents.Add.Response) {}
+}
+
+service IndexerService {
+  rpc ListNullifiers(Anoma.Protobuf.Indexer.Nullifiers.Request)
+      returns (Anoma.Protobuf.Indexer.Nullifiers.Response) {}
+
+  rpc ListUnrevealedCommits(Anoma.Protobuf.Indexer.UnrevealedCommits.Request)
+      returns (Anoma.Protobuf.Indexer.UnrevealedCommits.Response) {}
+
+  rpc ListUnspentResources(Anoma.Protobuf.Indexer.UnspentResources.Request)
+      returns (Anoma.Protobuf.Indexer.UnspentResources.Response) {}
+}
+
+service MempoolService {
+  rpc Add(Anoma.Protobuf.Mempool.AddTransaction.Request)
+      returns (Anoma.Protobuf.Mempool.AddTransaction.Response) {}
+}

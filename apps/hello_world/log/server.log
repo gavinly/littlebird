@@ -1,0 +1,46 @@
+==> logger_file_backend
+Compiling 1 file (.ex)
+Generated logger_file_backend app
+==> telemetry_metrics
+Compiling 7 files (.ex)
+Generated telemetry_metrics app
+==> hello_world
+===> Analyzing applications...
+===> Compiling telemetry_poller
+==> esbuild
+Compiling 4 files (.ex)
+Generated esbuild app
+==> phoenix_live_view
+Compiling 39 files (.ex)
+     warning: incompatible types given to String.to_atom/1:
+
+         String.to_atom(template)
+
+     given types:
+
+         -dynamic(false or {term(), binary()})-
+
+     but expected one of:
+
+         binary()
+
+     where "template" was given the type:
+
+         # type: dynamic(false or {term(), binary()})
+         # from: lib/phoenix_live_view/router.ex:300:18
+         template = Phoenix.LiveView.Utils.normalize_layout(template)
+
+     typing violation found at:
+     │
+ 301 │         Map.put(acc, :root_layout, {mod, String.to_atom(template)})
+     │                                                 ~
+     │
+     └─ lib/phoenix_live_view/router.ex:301:49: Phoenix.LiveView.Router.validate_live_session_opts/3
+
+Generated phoenix_live_view app
+==> phoenix_live_dashboard
+Compiling 36 files (.ex)
+Generated phoenix_live_dashboard app
+==> hello_world
+Compiling 8 files (.ex)
+Generated hello_world app
