@@ -15,7 +15,13 @@ defmodule DeployHello.IntentStore do
   end
 
   def list_intents do
-    GenServer.call(__MODULE__, :list_intents)
+    try do
+      :ets.tab2list(@intent_store)
+      |> Enum.map(fn {_id, intent} -> intent end)
+      |> Enum.sort_by(& &1.created_at, {:desc, DateTime})
+    rescue
+      _ -> []
+    end
   end
 
   def add_intent(intent) do
@@ -27,25 +33,40 @@ defmodule DeployHello.IntentStore do
   @impl true
   def init(_args) do
     Logger.info("Starting intent store")
-    :ets.new(@intent_store, [:set, :public, :named_table, :protected])
+    :ets.new(@intent_store, [:set, :public, :named_table])
     {:ok, %{}}
   end
 
   @impl true
   def handle_call({:store_intent, intent}, _from, state) do
-    Logger.info("Storing intent in ETS: #{inspect(intent)}")
+    Logger.info("Storing intent: #{inspect(intent)}")
     :ets.insert(@intent_store, {intent.id, intent})
     {:reply, :ok, state}
   end
 
   @impl true
   def handle_call(:list_intents, _from, state) do
-    intents = :ets.tab2list(@intent_store) |> Enum.map(fn {_id, intent} -> intent end)
-    Logger.info("Retrieved intents from ETS: #{inspect(intents)}")
+    intents = list_intents()
+    Logger.info("Retrieved #{length(intents)} intents")
     {:reply, intents, state}
   end
 
-  def handle_cast({:add_intent, intent}, intents) do
-    {:noreply, [intent | intents]}
+  @impl true
+  def handle_cast({:add_intent, intent}, state) do
+    Logger.info("Adding intent via cast: #{inspect(intent)}")
+    :ets.insert(@intent_store, {intent.id, intent})
+    {:noreply, state}
+  end
+
+  # Helper functions
+  
+  def clear_expired_intents do
+    now = DateTime.utc_now()
+    list_intents()
+    |> Enum.each(fn intent ->
+      if intent.expiry && DateTime.compare(intent.expiry, now) == :lt do
+        :ets.delete(@intent_store, intent.id)
+      end
+    end)
   end
 end 
