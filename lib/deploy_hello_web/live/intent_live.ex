@@ -4,33 +4,48 @@ defmodule DeployHelloWeb.IntentLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    Logger.info("Mounting IntentLive")
     if connected?(socket) do
       :timer.send_interval(1000, self(), :update)
     end
 
     intents = DeployHello.IntentStore.list_intents()
+    Logger.info("Initial intents: #{inspect(intents)}")
+    
     {:ok, assign(socket, intents: intents, new_intent: %{amount: "", expiry: ""})}
   end
 
   @impl true
   def handle_event("create", %{"intent" => intent_params}, socket) do
+    Logger.info("Creating intent with params: #{inspect(intent_params)}")
+    
     expiry = case intent_params["expiry"] do
       "" -> nil
+      nil -> nil
       time_str -> 
-        {minutes, _} = Integer.parse(time_str)
-        DateTime.add(DateTime.utc_now(), minutes * 60, :second)
+        case Integer.parse(time_str) do
+          {minutes, _} -> DateTime.add(DateTime.utc_now(), minutes * 60, :second)
+          :error -> nil
+        end
     end
 
     intent = %{
-      id: System.unique_integer([:positive]),
-      amount: String.to_integer(intent_params["amount"]),
+      id: System.unique_integer([:positive, :monotonic]),
+      amount: case Integer.parse(intent_params["amount"]) do
+        {amount, _} -> amount
+        :error -> 0
+      end,
       status: "pending",
       expiry: expiry,
       created_at: DateTime.utc_now()
     }
 
+    Logger.info("Storing new intent: #{inspect(intent)}")
     DeployHello.IntentStore.store_intent(intent)
+    
     intents = DeployHello.IntentStore.list_intents()
+    Logger.info("Updated intents list: #{inspect(intents)}")
+    
     {:noreply, assign(socket, intents: intents, new_intent: %{amount: "", expiry: ""})}
   end
 
@@ -43,6 +58,7 @@ defmodule DeployHelloWeb.IntentLive do
         expiry -> DateTime.compare(expiry, DateTime.utc_now()) == :gt
       end
     end)
+    
     {:noreply, assign(socket, intents: intents)}
   end
 
@@ -50,8 +66,6 @@ defmodule DeployHelloWeb.IntentLive do
   def render(assigns) do
     ~H"""
     <div class="mx-auto max-w-2xl">
-      <h1 class="text-2xl font-bold mb-4">Intents Explorer</h1>
-      
       <div class="mb-8 p-4 bg-white rounded shadow">
         <h2 class="text-lg font-semibold mb-4">Create New Intent</h2>
         <form phx-submit="create" class="space-y-4">
@@ -82,9 +96,9 @@ defmodule DeployHelloWeb.IntentLive do
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
             </tr>
           </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
+          <tbody class="bg-white divide-y divide-gray-200" id="intents-list" phx-update="append">
             <%= for intent <- @intents do %>
-              <tr>
+              <tr id={"intent-#{intent.id}"}>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= intent.id %></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><%= intent.amount %></td>
                 <td class="px-6 py-4 whitespace-nowrap">
@@ -94,12 +108,14 @@ defmodule DeployHelloWeb.IntentLive do
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   <%= if intent.expiry do %>
-                    <%= format_datetime(intent.expiry) %>
+                    <%= Calendar.strftime(intent.expiry, "%Y-%m-%d %H:%M:%S") %>
                   <% else %>
                     Never
                   <% end %>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><%= format_datetime(intent.created_at) %></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <%= Calendar.strftime(intent.created_at, "%Y-%m-d %H:%M:%S") %>
+                </td>
               </tr>
             <% end %>
           </tbody>
@@ -112,8 +128,4 @@ defmodule DeployHelloWeb.IntentLive do
   defp status_color("pending"), do: "bg-yellow-100 text-yellow-800"
   defp status_color("matched"), do: "bg-green-100 text-green-800"
   defp status_color(_), do: "bg-gray-100 text-gray-800"
-
-  defp format_datetime(datetime) do
-    Calendar.strftime(datetime, "%Y-%m-%d %H:%M:%S")
-  end
 end 

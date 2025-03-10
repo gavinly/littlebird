@@ -19,7 +19,7 @@ config :deploy_hello, DeployHelloWeb.Endpoint,
     layout: false
   ],
   pubsub_server: DeployHello.PubSub,
-  live_view: [signing_salt: "YOUR_SIGNING_SALT"]
+  live_view: [signing_salt: "5jNVstLz"]
 
 # Configures the mailer
 #
@@ -53,9 +53,9 @@ config :tailwind,
   ]
 
 # Configures Elixir's Logger
-config :logger,
-  level: :info,
-  backends: [:console]
+config :logger, :console,
+  format: "$time $metadata[$level] $message\n",
+  metadata: [:request_id]
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
