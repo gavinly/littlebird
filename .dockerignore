@@ -1,0 +1,12 @@
+.git
+.gitignore
+# Mix artifacts
+_build
+deps
+*.ez
+# Generate on crash by the VM
+erl_crash.dump
+# Static artifacts
+node_modules
+# We need the static assets for production
+# /priv/static/ 
